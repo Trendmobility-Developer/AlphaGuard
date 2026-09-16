@@ -1,6 +1,8 @@
+import { headers } from 'next/headers';
 import { requireProfile } from '@/lib/dal';
 import { createClient } from '@/lib/supabase/server';
 import type { Site } from '@/lib/types';
+import { pairingQrDataUrl } from '@/lib/qr';
 import { deleteSite } from '../actions';
 import { NewSiteForm } from './NewSiteForm';
 
@@ -14,6 +16,16 @@ export default async function SitesPage() {
     .eq('org_id', profile.org_id)
     .order('created_at', { ascending: true });
 
+  const h = await headers();
+  const baseUrl = `https://${h.get('x-forwarded-host') ?? h.get('host')}`;
+
+  const withQr = await Promise.all(
+    ((sites as Site[] | null) ?? []).map(async (s) => ({
+      site: s,
+      qr: await pairingQrDataUrl({ url: baseUrl, key: s.api_key, name: s.name }),
+    })),
+  );
+
   return (
     <div className="space-y-5">
       <div className="rounded-xl border border-black/10 bg-white p-4">
@@ -23,15 +35,21 @@ export default async function SitesPage() {
 
       <div className="rounded-xl border border-black/10 bg-white">
         <div className="border-b border-black/10 px-4 py-3 text-sm font-bold text-brand">
-          Sites &amp; API keys
+          Sites &amp; devices
         </div>
-        {(sites as Site[] | null)?.length ? (
+        {withQr.length ? (
           <ul className="divide-y divide-black/5">
-            {(sites as Site[]).map((s) => (
-              <li key={s.id} className="flex items-center gap-3 px-4 py-3">
+            {withQr.map(({ site: s, qr }) => (
+              <li key={s.id} className="flex items-center gap-4 px-4 py-4">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={qr} alt={`Pairing QR for ${s.name}`} className="h-24 w-24 rounded-lg border border-black/10" />
                 <div className="flex-1">
                   <div className="text-sm font-semibold">{s.name}</div>
-                  <div className="font-mono text-xs text-gray-500">{s.api_key}</div>
+                  <div className="text-xs text-gray-500">
+                    On the scanner: Settings → Backend Sync → <span className="font-semibold">Scan QR to pair</span> →
+                    point it at this code.
+                  </div>
+                  <div className="mt-1 font-mono text-[11px] text-gray-400">{s.api_key}</div>
                 </div>
                 <form action={deleteSite.bind(null, s.id)}>
                   <button className="rounded-lg border border-red-200 px-3 py-1 text-xs font-semibold text-red-600 hover:bg-red-50">
@@ -47,8 +65,8 @@ export default async function SitesPage() {
       </div>
 
       <p className="text-xs text-gray-500">
-        Put a site&apos;s API key into the AlphaGuard app&apos;s Settings → Backend Sync, along with this
-        dashboard&apos;s URL, so its scans show up here.
+        Each site gets its own QR code. Scanning it on the device sets the server URL, API key, and
+        device name in one shot — no typing.
       </p>
     </div>
   );
