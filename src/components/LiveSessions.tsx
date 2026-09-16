@@ -5,19 +5,20 @@ import { createClient } from '@/lib/supabase/client';
 import type { Session } from '@/lib/types';
 import { SessionsTable } from './SessionsTable';
 
+export type LiveMode = 'active' | 'flagged';
+
+function matches(mode: LiveMode, s: Session): boolean {
+  return mode === 'active' ? s.status === 'IN_PROGRESS' : s.flagged;
+}
+
 /**
- * Renders `initial`, then keeps itself in sync via Supabase Realtime —
- * no manual refresh needed. `filter` narrows which rows this view cares
- * about (e.g. only IN_PROGRESS, or only flagged); Realtime still only ever
- * delivers rows the viewer's RLS policy allows.
+ * Renders `initial`, then keeps itself in sync via Supabase Realtime — no
+ * manual refresh needed. `mode` is a plain string (not a function — functions
+ * can't cross the Server -> Client Component boundary) narrowing which rows
+ * this view cares about. Realtime still only ever delivers rows the viewer's
+ * RLS policy allows.
  */
-export function LiveSessions({
-  initial,
-  filter,
-}: {
-  initial: Session[];
-  filter: (s: Session) => boolean;
-}) {
+export function LiveSessions({ initial, mode }: { initial: Session[]; mode: LiveMode }) {
   const [sessions, setSessions] = useState(initial);
 
   useEffect(() => {
@@ -50,5 +51,5 @@ export function LiveSessions({
     };
   }, []);
 
-  return <SessionsTable sessions={sessions.filter(filter)} />;
+  return <SessionsTable sessions={sessions.filter((s) => matches(mode, s))} />;
 }

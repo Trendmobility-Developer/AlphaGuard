@@ -14,5 +14,5 @@ export default async function FlaggedPage() {
     .eq('flagged', true)
     .order('check_in_time', { ascending: false });
 
-  return <LiveSessions initial={(sessions as Session[]) ?? []} filter={(s) => s.flagged} />;
+  return <LiveSessions initial={(sessions as Session[]) ?? []} mode="flagged" />;
 }

@@ -44,7 +44,7 @@ export default async function OnPremisesPage() {
         <StatCard label="Out today" value={outCount ?? 0} />
         <StatCard label="On premises now" value={activeCount ?? 0} />
       </div>
-      <LiveSessions initial={(sessions as Session[]) ?? []} filter={(s) => s.status === 'IN_PROGRESS'} />
+      <LiveSessions initial={(sessions as Session[]) ?? []} mode="active" />
     </div>
   );
 }
