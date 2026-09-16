@@ -1,7 +1,6 @@
 import { requireProfile } from '@/lib/dal';
 import { createClient } from '@/lib/supabase/server';
-import { StatCard } from '@/components/StatCard';
-import { LiveSessions } from '@/components/LiveSessions';
+import { LiveHomeBoard } from '@/components/LiveHomeBoard';
 import type { Session } from '@/lib/types';
 
 export default async function OnPremisesPage() {
@@ -10,41 +9,17 @@ export default async function OnPremisesPage() {
 
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
+  const todayStartMs = todayStart.getTime();
 
-  const [{ data: sessions }, { count: inCount }, { count: outCount }, { count: activeCount }] =
-    await Promise.all([
-      supabase
-        .from('sessions')
-        .select('*')
-        .eq('org_id', profile.org_id)
-        .eq('status', 'IN_PROGRESS')
-        .order('check_in_time', { ascending: false }),
-      supabase
-        .from('sessions')
-        .select('*', { count: 'exact', head: true })
-        .eq('org_id', profile.org_id)
-        .gte('check_in_time', todayStart.getTime()),
-      supabase
-        .from('sessions')
-        .select('*', { count: 'exact', head: true })
-        .eq('org_id', profile.org_id)
-        .eq('status', 'COMPLETED')
-        .gte('check_in_time', todayStart.getTime()),
-      supabase
-        .from('sessions')
-        .select('*', { count: 'exact', head: true })
-        .eq('org_id', profile.org_id)
-        .eq('status', 'IN_PROGRESS'),
-    ]);
+  // One query covers all three tabs: everything still on premises, plus
+  // everything checked in today (whether it's out again or not yet).
+  const { data: sessions } = await supabase
+    .from('sessions')
+    .select('*')
+    .eq('org_id', profile.org_id)
+    .or(`status.eq.IN_PROGRESS,check_in_time.gte.${todayStartMs}`)
+    .order('check_in_time', { ascending: false })
+    .limit(1000);
 
-  return (
-    <div className="space-y-5">
-      <div className="flex gap-3">
-        <StatCard label="In today" value={inCount ?? 0} />
-        <StatCard label="Out today" value={outCount ?? 0} />
-        <StatCard label="On premises now" value={activeCount ?? 0} />
-      </div>
-      <LiveSessions initial={(sessions as Session[]) ?? []} mode="active" />
-    </div>
-  );
+  return <LiveHomeBoard initial={(sessions as Session[]) ?? []} todayStart={todayStartMs} />;
 }
